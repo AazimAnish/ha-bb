@@ -3,6 +3,14 @@ import { BASE_PROMPT, getSystemPrompt } from "./prompts";
 
 const groq = new Groq();
 
+async function consumeStream(stream: AsyncIterable<any>) {
+    let content = '';
+    for await (const chunk of stream) {
+        content += chunk.choices[0]?.delta?.content || '';
+    }
+    return content;
+}
+
 export async function POST(request: Request) {
     const { messages, type } = await request.json();
 
@@ -19,10 +27,10 @@ export async function POST(request: Request) {
             model: "mixtral-8x7b-32768",
             temperature: 0,
             max_tokens: 200,
-            stream: false
+            stream: true
         });
 
-        const stack = stackResponse.choices[0]?.message?.content?.trim().toLowerCase() || 'nextjs';
+        const stack = await consumeStream(stackResponse);
 
         // Then, generate the template based on the stack
         const templateResponse = await groq.chat.completions.create({
@@ -40,10 +48,10 @@ export async function POST(request: Request) {
             model: "mixtral-8x7b-32768",
             temperature: 0,
             max_tokens: 8000,
-            stream: false
+            stream: true
         });
 
-        const generatedTemplate = templateResponse.choices[0]?.message?.content || '';
+        const generatedTemplate = await consumeStream(templateResponse);
 
         return Response.json({
             prompts: [BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${generatedTemplate}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
@@ -58,12 +66,13 @@ export async function POST(request: Request) {
             content: getSystemPrompt()
         }, ...messages],
         model: "mixtral-8x7b-32768",
-        max_tokens: 8000
+        max_tokens: 8000,
+        stream: true
     });
 
-    console.log(chatCompletion);
+    const response = await consumeStream(chatCompletion);
 
     return Response.json({
-        response: chatCompletion.choices[0]?.message?.content
+        response
     });
 }
