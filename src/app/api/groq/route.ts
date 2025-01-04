@@ -1,6 +1,5 @@
 import Groq from "groq-sdk";
-import { getSystemPrompt } from "./prompts";
-import { getTemplatePrompt, getBasePrompt } from "../templates/route";
+import { BASE_PROMPT, getSystemPrompt } from "./prompts";
 
 const groq = new Groq();
 
@@ -8,10 +7,11 @@ export async function POST(request: Request) {
     const { messages, type } = await request.json();
 
     if (type === "template") {
-        const templateResponse = await groq.chat.completions.create({
+        // First, determine the stack
+        const stackResponse = await groq.chat.completions.create({
             messages: [{
                 role: "system",
-                content: "You are a project stack analyzer. Analyze the requirements and return a JSON response with a 'stack' field that contains either 'node' or 'react'. Example: {\"stack\": \"react\"}"
+                content: "Analyze the prompt and return a stack. If a specific stack is mentioned, return that. If no stack is specified, return 'nextjs'. Return only the stack name in lowercase, no other text."
             }, {
                 role: "user",
                 content: messages[0].content
@@ -19,16 +19,35 @@ export async function POST(request: Request) {
             model: "mixtral-8x7b-32768",
             temperature: 0,
             max_tokens: 200,
-            stream: false,
-            response_format: { type: "json_object" }
+            stream: false
         });
 
-        const stack = templateResponse.choices[0]?.message?.content || '';
-        const stackType = JSON.parse(stack).stack || 'react'; // Default to react if parsing fails
-        
+        const stack = stackResponse.choices[0]?.message?.content?.trim().toLowerCase() || 'nextjs';
+
+        // Then, generate the template based on the stack
+        const templateResponse = await groq.chat.completions.create({
+            messages: [{
+                role: "system",
+                content: `Generate a project template for a ${stack} application. The response must be in this exact format:
+                '<boltArtifact id="project-import" title="Project Files"><boltAction type="file" filePath="...">[file content]</boltAction>...</boltArtifact>'
+                
+                Include essential files like package.json, configuration files, and basic source files. Format must match exactly.
+                Do not include any explanation or additional text.`
+            }, {
+                role: "user",
+                content: messages[0].content
+            }],
+            model: "mixtral-8x7b-32768",
+            temperature: 0,
+            max_tokens: 8000,
+            stream: false
+        });
+
+        const generatedTemplate = templateResponse.choices[0]?.message?.content || '';
+
         return Response.json({
-            prompts: [getTemplatePrompt(stackType)],
-            uiPrompts: [getBasePrompt(stackType)]
+            prompts: [BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${generatedTemplate}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+            uiPrompts: [generatedTemplate]
         });
     }
 
@@ -39,24 +58,12 @@ export async function POST(request: Request) {
             content: getSystemPrompt()
         }, ...messages],
         model: "mixtral-8x7b-32768",
-        temperature: 0,
-        max_tokens: 1024,
-        top_p: 1,
-        stream: true,
-        stop: null
+        max_tokens: 8000
     });
 
-    const responseStream = new ReadableStream({
-        async start(controller) {
-            for await (const chunk of chatCompletion) {
-                const content = chunk.choices[0]?.delta?.content || '';
-                controller.enqueue(content);
-            }
-            controller.close();
-        },
-    });
+    console.log(chatCompletion);
 
-    return new Response(responseStream, {
-        headers: { "Content-Type": "text/plain" },
+    return Response.json({
+        response: chatCompletion.choices[0]?.message?.content
     });
 }
