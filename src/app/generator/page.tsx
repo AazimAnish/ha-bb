@@ -267,16 +267,16 @@ export default function GeneratorPage() {
   }, [prompt]);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="min-h-screen bg-black flex flex-col">
       {error && (
-        <div className="bg-red-500 text-white px-6 py-4">
+        <div className="bg-[#F14A00] text-white px-6 py-4">
           <div className="container mx-auto">
-            <p className="font-medium">Error: {error}</p>
+            <p className="font-medium">{error}</p>
           </div>
         </div>
       )}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <h1 className="text-xl font-semibold text-gray-100">Website Builder</h1>
+      <header className="bg-black border-b border-[#F14A00]/20 px-6 py-4">
+        <h1 className="text-xl font-semibold text-white">Website Builder</h1>
         <p className="text-sm text-gray-400 mt-1">Prompt: {prompt}</p>
       </header>
       
@@ -296,15 +296,16 @@ export default function GeneratorPage() {
                   <br />
                   {(loading || !templateSet) && <Loader />}
                   {!(loading || !templateSet) && (
-                    <div className='flex'>
+                    <div className='flex w-full gap-2'>
                       <textarea 
                         value={userPrompt} 
                         onChange={(e) => setUserPrompt(e.target.value)}
-                        className='p-2 w-full'
+                        className='p-2 w-full bg-transparent border border-[#F14A00]/20 rounded-lg text-white placeholder-gray-400 focus:border-[#F14A00]/50 focus:ring-[#F14A00]/30'
+                        placeholder="Enter additional instructions..."
                       />
                       <button 
                         onClick={handleSendPrompt}
-                        className='bg-purple-400 px-4'
+                        className='bg-[#F14A00]/60 hover:bg-[#D93F00] text-white px-4 rounded-lg transition-colors duration-200 border border-[#F14A00]/30'
                       >
                         Send
                       </button>
@@ -319,8 +320,8 @@ export default function GeneratorPage() {
                 files={files} 
                 onFileSelect={setSelectedFile}
               />
-            </div>
-          <div className="col-span-2 bg-gray-900 rounded-lg shadow-lg p-4 h-[calc(100vh-8rem)]">
+          </div>
+          <div className="col-span-2 bg-black border border-[#F14A00]/20 rounded-lg shadow-lg p-4 h-[calc(100vh-8rem)]">
             <TabView activeTab={activeTab} onTabChange={setActiveTab} />
             <div className="h-[calc(100%-4rem)]">
               {activeTab === 'code' ? (
