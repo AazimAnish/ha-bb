@@ -1,5 +1,6 @@
-import Groq from "groq-sdk";
-import { BASE_PROMPT, getSystemPrompt } from "./prompts";
+// app/api/groq/route.ts
+import { Groq } from "groq-sdk";
+import { TEMPLATE_FILES, BASE_PROMPT, getSystemPrompt } from "@/lib/templates";
 
 if (!process.env.GROQ_API_KEY) {
     throw new Error('GROQ_API_KEY is not set in environment variables');
@@ -17,9 +18,9 @@ async function consumeStream(stream: AsyncIterable<any>) {
         }
     } catch (error) {
         console.error('Error consuming stream:', error);
-        throw error; // Re-throw to be caught by the main try-catch
+        throw error;
     }
-    return content;
+    return content.trim();
 }
 
 export async function POST(request: Request) {
@@ -35,11 +36,11 @@ export async function POST(request: Request) {
 
         if (type === "template") {
             try {
-                // First, determine the stack
+                // Determine the stack
                 const stackResponse = await groq.chat.completions.create({
                     messages: [{
                         role: "system",
-                        content: "Analyze the prompt and return a stack. If a specific stack is mentioned, return that. If no stack is specified, return 'nextjs'. Return only the stack name in lowercase, no other text."
+                        content: "Analyze the prompt and determine the best stack. Options are: nextjs (default), react, or node. If a specific stack is mentioned, return that. If no stack is specified or if it's a website/webapp, return 'nextjs'. Return only the stack name in lowercase, no other text."
                     }, {
                         role: "user",
                         content: messages[0].content
@@ -51,34 +52,21 @@ export async function POST(request: Request) {
                 });
 
                 const stack = await consumeStream(stackResponse);
-                if (!stack) {
-                    throw new Error('Failed to determine stack');
+                
+                // Validate stack exists in templates
+                if (!stack || !TEMPLATE_FILES[stack as keyof typeof TEMPLATE_FILES]) {
+                    throw new Error(`Invalid stack determined: ${stack}`);
                 }
 
-                // Then, generate the template based on the stack
-                const templateResponse = await groq.chat.completions.create({
-                    messages: [{
-                        role: "system",
-                        content: `Generate a project template for a ${stack} application. The response must be in XML format with file actions.`
-                    }, {
-                        role: "user",
-                        content: messages[0].content
-                    }],
-                    model: "mixtral-8x7b-32768",
-                    temperature: 0,
-                    max_tokens: 8000,
-                    stream: true
-                });
+                // Get template for determined stack
+                const template = TEMPLATE_FILES[stack as keyof typeof TEMPLATE_FILES];
 
-                const generatedTemplate = await consumeStream(templateResponse);
-                if (!generatedTemplate) {
-                    throw new Error('Failed to generate template');
-                }
-
+                // Return both the prompts and uiPrompts as expected by the client
                 return Response.json({
                     prompts: [BASE_PROMPT],
-                    uiPrompts: [generatedTemplate]
+                    uiPrompts: [template]
                 });
+
             } catch (error) {
                 console.error('Template generation error:', error);
                 return Response.json(
@@ -91,15 +79,15 @@ export async function POST(request: Request) {
             }
         }
 
-        // Regular chat completion
+        // Regular chat completion for implementation
         try {
             const chatCompletion = await groq.chat.completions.create({
                 messages: [{
                     role: "system",
                     content: getSystemPrompt()
                 }, ...messages.map((msg: any) => ({
-                    role: msg.role,
-                    content: msg.content
+                    role: msg.role || "user",
+                    content: typeof msg === 'string' ? msg : msg.content
                 }))],
                 model: "mixtral-8x7b-32768",
                 temperature: 0,
@@ -108,11 +96,13 @@ export async function POST(request: Request) {
             });
 
             const response = await consumeStream(chatCompletion);
+            
             if (!response) {
                 throw new Error('No response from Groq API');
             }
 
             return Response.json({ response });
+
         } catch (error) {
             console.error('Chat completion error:', error);
             return Response.json(
