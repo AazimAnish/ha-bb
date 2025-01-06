@@ -1,4 +1,3 @@
-// app/api/groq/route.ts
 import { Groq } from "groq-sdk";
 import { TEMPLATE_FILES, BASE_PROMPT, getSystemPrompt } from "@/lib/templates";
 
@@ -51,11 +50,15 @@ export async function POST(request: Request) {
                     stream: true
                 });
 
-                const stack = await consumeStream(stackResponse);
+                let stack = await consumeStream(stackResponse);
                 
-                // Validate stack exists in templates
-                if (!stack || !TEMPLATE_FILES[stack as keyof typeof TEMPLATE_FILES]) {
-                    throw new Error(`Invalid stack determined: ${stack}`);
+                // Normalize and validate stack
+                stack = stack.toLowerCase().trim();
+                
+                // If stack is not one of the valid options, default to nextjs
+                if (!TEMPLATE_FILES[stack as keyof typeof TEMPLATE_FILES]) {
+                    console.log(`Invalid or unspecified stack "${stack}", defaulting to nextjs`);
+                    stack = 'nextjs';
                 }
 
                 // Get template for determined stack
@@ -69,13 +72,11 @@ export async function POST(request: Request) {
 
             } catch (error) {
                 console.error('Template generation error:', error);
-                return Response.json(
-                    { 
-                        error: 'Template Generation Error', 
-                        details: error instanceof Error ? error.message : 'Unknown error'
-                    },
-                    { status: 500 }
-                );
+                // Default to nextjs template in case of error
+                return Response.json({
+                    prompts: [BASE_PROMPT],
+                    uiPrompts: [TEMPLATE_FILES.nextjs]
+                });
             }
         }
 
