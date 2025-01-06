@@ -1,37 +1,50 @@
-import { useState, useEffect } from 'react';
 import { WebContainer } from '@webcontainer/api';
+import { useState, useEffect } from 'react';
 
+// Global instance to ensure single WebContainer
 let webcontainerInstance: WebContainer | null = null;
+let bootPromise: Promise<WebContainer> | null = null;
 
 export function useWebContainer() {
-    const [webcontainer, setWebcontainer] = useState<WebContainer>();
+    const [webcontainer, setWebcontainer] = useState<WebContainer | null>(null);
+    const [error, setError] = useState<Error | null>(null);
 
     useEffect(() => {
-        let mounted = true;
-
-        async function initWebContainer() {
+        async function bootWebContainer() {
             try {
-                // Only initialize if no instance exists
-                if (!webcontainerInstance && mounted) {
-                    webcontainerInstance = await WebContainer.boot();
-                    if (mounted) {
-                        setWebcontainer(webcontainerInstance);
-                    }
-                } else if (mounted && webcontainerInstance) {
-                    // If instance exists, just set it
+                // If already booted, return existing instance
+                if (webcontainerInstance) {
                     setWebcontainer(webcontainerInstance);
+                    return;
                 }
+
+                // If boot in progress, wait for it
+                if (bootPromise) {
+                    const instance = await bootPromise;
+                    setWebcontainer(instance);
+                    return;
+                }
+
+                // Start new boot process
+                bootPromise = WebContainer.boot();
+                webcontainerInstance = await bootPromise;
+                setWebcontainer(webcontainerInstance);
             } catch (error) {
-                console.error('Failed to initialize WebContainer:', error);
+                console.error('Failed to boot WebContainer:', error);
+                setError(error as Error);
+                // Reset promises/instances on error
+                bootPromise = null;
+                webcontainerInstance = null;
             }
         }
 
-        initWebContainer();
+        bootWebContainer();
 
         return () => {
-            mounted = false;
+            // Cleanup if component unmounts
+            // Note: We don't cleanup webcontainerInstance here as it should persist
         };
-    }, []); // Remove webcontainer dependency to prevent re-initialization
+    }, []);
 
-    return webcontainer;
+    return { webcontainer, error };
 }

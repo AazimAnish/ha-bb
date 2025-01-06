@@ -1,135 +1,131 @@
 export const TEMPLATE_FILES = {
-    nextjs: `<boltArtifact id="project-import" title="Next.js Project Files">
-        <boltAction type="file" filePath="package.json">
-        {
-          "name": "next-app",
-          "version": "0.1.0",
-          "private": true,
-          "scripts": {
-            "dev": "next dev",
-            "build": "next build",
-            "start": "next start",
-            "lint": "next lint"
-          },
-          "dependencies": {
-            "next": "14.1.0",
-            "react": "^18",
-            "react-dom": "^18"
-          },
-          "devDependencies": {
-            "@types/node": "^20",
-            "@types/react": "^18",
-            "@types/react-dom": "^18",
-            "typescript": "^5",
-            "autoprefixer": "^10.0.1",
-            "postcss": "^8",
-            "tailwindcss": "^3.3.0",
-            "eslint": "^8",
-            "eslint-config-next": "14.1.0"
-          }
-        }
-        </boltAction>
-        <boltAction type="file" filePath="tsconfig.json">
-        {
-          "compilerOptions": {
-            "lib": ["dom", "dom.iterable", "esnext"],
-            "allowJs": true,
-            "skipLibCheck": true,
-            "strict": true,
-            "noEmit": true,
-            "esModuleInterop": true,
-            "module": "esnext",
-            "moduleResolution": "bundler",
-            "resolveJsonModule": true,
-            "isolatedModules": true,
-            "jsx": "preserve",
-            "incremental": true,
-            "plugins": [
-              {
-                "name": "next"
-              }
-            ],
-            "paths": {
-              "@/*": ["./src/*"]
-            }
-          },
-          "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-          "exclude": ["node_modules"]
-        }
-        </boltAction>
-        <boltAction type="file" filePath="next.config.mjs">
-        /** @type {import('next').NextConfig} */
-        const nextConfig = {
-          reactStrictMode: true,
-        };
-        
-        export default nextConfig;
-        </boltAction>
-        <boltAction type="file" filePath="postcss.config.js">
-        module.exports = {
-          plugins: {
-            tailwindcss: {},
-            autoprefixer: {},
-          },
-        };
-        </boltAction>
-        <boltAction type="file" filePath="tailwind.config.ts">
-        import type { Config } from "tailwindcss";
-        
-        const config: Config = {
-          content: [
-            "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-            "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-            "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-          ],
-          theme: {
-            extend: {},
-          },
-          plugins: [],
-        };
-        export default config;
-        </boltAction>
-        <boltAction type="file" filePath="src/app/layout.tsx">
-        import type { Metadata } from "next";
-        import { Inter } from "next/font/google";
-        import "./globals.css";
-        
-        const inter = Inter({ subsets: ["latin"] });
-        
-        export const metadata: Metadata = {
-          title: "Next.js App",
-          description: "Generated Next.js Application",
-        };
-        
-        export default function RootLayout({
-          children,
-        }: Readonly<{
-          children: React.ReactNode;
-        }>) {
-          return (
-            <html lang="en">
-              <body className={inter.className}>{children}</body>
-            </html>
-          );
-        }
-        </boltAction>
-        <boltAction type="file" filePath="src/app/globals.css">
-        @tailwind base;
-        @tailwind components;
-        @tailwind utilities;
-        </boltAction>
-        <boltAction type="file" filePath="src/app/page.tsx">
-        export default function Home() {
-          return (
-            <main className="flex min-h-screen flex-col items-center justify-center p-24">
-              <p>Start prompting to see magic happen :)</p>
-            </main>
-          );
-        }
-        </boltAction>
-        </boltArtifact>`,
+  nextjs: `<boltArtifact id="project-import" title="Next.js Project Files">
+<boltAction type="file" filePath="package.json">
+{
+  "name": "next-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.1.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "@prisma/client": "^5.10.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.3.0",
+    "eslint": "^8",
+    "eslint-config-next": "14.1.0",
+    "prisma": "^5.10.0"
+  }
+}
+</boltAction>
 
-    react: `<boltArtifact id="project-import" title="React Project Files">
+<boltAction type="file" filePath="src/lib/utils.ts">
+import { type ClassValue, clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+</boltAction>
+
+<boltAction type="file" filePath="src/app/api/todos/route.ts">
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+const TodoSchema = z.object({
+  title: z.string().min(1),
+  completed: z.boolean().default(false),
+});
+
+export async function GET() {
+  try {
+    const todos = await prisma.todo.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return NextResponse.json(todos);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch todos' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const json = await request.json();
+    const body = TodoSchema.parse(json);
+
+    const todo = await prisma.todo.create({
+      data: body
+    });
+
+    return NextResponse.json(todo);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.errors },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: 'Failed to create todo' },
+      { status: 500 }
+    );
+  }
+}
+</boltAction>
+
+<boltAction type="file" filePath="prisma/schema.prisma">
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Todo {
+  id        String   @id @default(cuid())
+  title     String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+</boltAction>
+
+<boltAction type="file" filePath="src/lib/prisma.ts">
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+</boltAction>
+</boltArtifact>`,
+
+  react: `<boltArtifact id="project-import" title="React Project Files">
         <boltAction type="file" filePath="package.json">
         {
           "name": "vite-react",
@@ -165,7 +161,7 @@ export const TEMPLATE_FILES = {
         </boltAction>
         </boltArtifact>`,
 
-    node: `<boltArtifact id="project-import" title="Node.js Project Files">
+  node: `<boltArtifact id="project-import" title="Node.js Project Files">
         <boltAction type="file" filePath="package.json">
         {
           "name": "node-starter",
@@ -187,36 +183,46 @@ export const TEMPLATE_FILES = {
           }
         }
         </boltAction>
-        </boltArtifact>`
+        </boltArtifact>`,
 };
 
-export const BASE_PROMPT = `You are a code generator AI. You will receive user prompts and must generate code based on them.
-Always respond with XML tags in this format:
+export const BASE_PROMPT = `You are a Next.js 14 expert. Generate modern, production-ready Next.js applications using the App Router and React Server Components.
 
-<boltArtifact id="..." title="...">
+Always respond with XML tags in this format:
+<boltArtifact id="implementation" title="Next.js Implementation">
   <boltAction type="file" filePath="path/to/file">
     // File contents here...
   </boltAction>
 </boltArtifact>
 
-You can include multiple boltAction tags within a single boltArtifact.
-Each file's content must be complete and functional.`;
+Guidelines for Next.js applications:
+- Use the App Router and React Server Components
+- Implement proper data fetching patterns
+- Use TypeScript for type safety
+- Follow Next.js best practices
+- Include proper error handling
+- Add loading states and error boundaries
+- Use Tailwind CSS for styling
+- Keep components modular and reusable
+- Add proper comments for complex logic`;
 
 export function getSystemPrompt() {
-    return `You are a code generator AI assistant. Your responses should always be XML tags that create or modify files.
-
-Always use this format:
-<boltArtifact id="unique-id" title="Description">
-  <boltAction type="file" filePath="path/to/file">
-    // File contents
-  </boltAction>
-</boltArtifact>
-
-Guidelines:
-- Generate complete, functional code
-- Use TypeScript when possible
-- Follow best practices and conventions
-- Include proper error handling
-- Add comments for complex logic
-- Keep code modular and maintainable`;
+    return `You are a Next.js 14 expert. Generate code that follows these principles:
+    1. Use App Router and React Server Components by default
+    2. Implement proper data fetching and mutations
+    3. Use TypeScript for type safety
+    4. Follow Next.js best practices and conventions
+    5. Include error handling and loading states
+    6. Use Tailwind CSS for styling
+    7. Keep code modular and maintainable
+    8. Add proper comments for complex logic
+    
+    When generating files:
+    - Place components in src/components
+    - Place API routes in src/app/api
+    - Place utilities in src/lib
+    - Place types in src/types
+    - Use proper file naming conventions
+    
+    Always wrap file contents in <boltAction type="file" filePath="path/to/file"> tags.`;
 }

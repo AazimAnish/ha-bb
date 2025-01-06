@@ -35,7 +35,9 @@ export async function POST(request: Request) {
 
         if (type === "template") {
             try {
-                // Determine the stack
+                // Log template request
+                console.log('Template Request:', messages[0].content);
+
                 const stackResponse = await groq.chat.completions.create({
                     messages: [{
                         role: "system",
@@ -51,7 +53,8 @@ export async function POST(request: Request) {
                 });
 
                 let stack = await consumeStream(stackResponse);
-                
+                console.log('Stack Determination:', stack); // Log determined stack
+
                 // Normalize and validate stack
                 stack = stack.toLowerCase().trim();
                 
@@ -82,6 +85,8 @@ export async function POST(request: Request) {
 
         // Regular chat completion for implementation
         try {
+            console.log('Implementation Request:', messages); // Log implementation request
+
             const chatCompletion = await groq.chat.completions.create({
                 messages: [{
                     role: "system",
@@ -92,12 +97,13 @@ export async function POST(request: Request) {
                 }))],
                 model: "mixtral-8x7b-32768",
                 temperature: 0,
-                max_tokens: 8000,
+                max_tokens: 32768,
                 stream: true
             });
 
             const response = await consumeStream(chatCompletion);
-            
+            console.log('Implementation Response:', response); // Log implementation response
+
             if (!response) {
                 throw new Error('No response from Groq API');
             }
