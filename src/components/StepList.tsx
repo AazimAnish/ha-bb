@@ -13,9 +13,9 @@ export function StepsList({ steps, currentStep, onStepClick }: StepsListProps) {
     <div className="bg-black border border-[#F14A00]/20 rounded-lg shadow-lg p-4 h-full overflow-auto">
       <h2 className="text-lg font-semibold mb-4 text-white">Build Steps</h2>
       <div className="space-y-4">
-        {steps.map((step) => (
+        {steps.map((step, index) => (
           <div
-            key={step.id}
+            key={`${step.id}-${index}`}
             className={`p-3 rounded-lg cursor-pointer transition-colors ${
               currentStep === step.id
                 ? 'bg-[#F14A00]/20 border border-[#F14A00]/30'
