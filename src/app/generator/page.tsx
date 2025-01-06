@@ -396,10 +396,20 @@ export default defineConfig({
         
         if (!stepsResponse.ok) {
             const errorData = await stepsResponse.json();
-            throw new Error(errorData.error || `Steps API error: ${stepsResponse.status}`);
+            console.error('API Error:', errorData);
+            throw new Error(
+                errorData.details || 
+                errorData.error || 
+                `API request failed with status ${stepsResponse.status}`
+            );
         }
 
         const stepsData = await stepsResponse.json();
+        
+        if (!stepsData.response) {
+            throw new Error('Invalid response format from API');
+        }
+        
         console.log('GROQ Implementation Response:', stepsData);
 
         // Parse implementation files

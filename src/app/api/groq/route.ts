@@ -112,10 +112,26 @@ export async function POST(request: Request) {
 
         } catch (error) {
             console.error('Chat completion error:', error);
+            let errorMessage = 'Failed to generate chat completion';
+            let errorDetails = '';
+
+            if (error instanceof Error) {
+                errorMessage = error.message;
+                // Check if error message contains JSON
+                try {
+                    const parsedError = JSON.parse(error.message);
+                    errorMessage = parsedError.message || errorMessage;
+                    errorDetails = parsedError.details || '';
+                } catch {
+                    // Not JSON, use as is
+                }
+            }
+
             return Response.json(
                 { 
                     error: 'Chat Completion Error', 
-                    details: error instanceof Error ? error.message : 'Unknown error'
+                    message: errorMessage,
+                    details: errorDetails || errorMessage
                 },
                 { status: 500 }
             );
@@ -123,10 +139,25 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error('API Error:', error);
+        let errorMessage = 'Internal Server Error';
+        let errorDetails = '';
+
+        if (error instanceof Error) {
+            errorMessage = error.message;
+            // Check if error message contains JSON
+            try {
+                const parsedError = JSON.parse(error.message);
+                errorMessage = parsedError.message || errorMessage;
+                errorDetails = parsedError.details || '';
+            } catch {
+                // Not JSON, use as is
+            }
+        }
+
         return Response.json(
             { 
-                error: 'Internal Server Error', 
-                details: error instanceof Error ? error.message : 'Unknown error'
+                error: errorMessage, 
+                details: errorDetails || 'An unexpected error occurred'
             },
             { status: 500 }
         );
