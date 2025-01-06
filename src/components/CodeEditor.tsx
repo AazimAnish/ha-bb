@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileItem } from '@/types';
-import { Loader } from 'lucide-react';
-import { AlertCircle, FileCode, FolderOpen } from 'lucide-react';
+import { Loader, FileCode, FolderOpen } from 'lucide-react';
+import Editor from '@monaco-editor/react';
 
 interface CodeEditorProps {
   file?: FileItem | null;
@@ -9,34 +9,19 @@ interface CodeEditorProps {
   isLoading: boolean;
 }
 
-// Change to named export
 export function CodeEditor({ file, streamingContent, isLoading }: CodeEditorProps) {
   const [content, setContent] = useState('');
 
   useEffect(() => {
-    if (streamingContent) {
-      // Animate the content appearing
-      setContent('');
-      const lines = streamingContent.split('\n');
-      let currentLine = 0;
-      
-      const interval = setInterval(() => {
-        if (currentLine < lines.length) {
-          setContent(prev => prev + lines[currentLine] + '\n');
-          currentLine++;
-        } else {
-          clearInterval(interval);
-        }
-      }, 50); // Adjust speed as needed
-
-      return () => clearInterval(interval);
-    } else if (file?.content) {
+    if (file?.content) {
       setContent(file.content);
+    } else if (streamingContent) {
+      setContent(streamingContent);
     }
   }, [file, streamingContent]);
 
   const getFileExtension = (path: string | undefined): string => {
-    if (!path) return '';
+    if (!path) return 'typescript';
     const parts = path.split('.');
     return parts[parts.length - 1].toLowerCase();
   };
@@ -51,7 +36,7 @@ export function CodeEditor({ file, streamingContent, isLoading }: CodeEditorProp
       json: 'json',
       html: 'html',
     };
-    return languageMap[ext] || 'text';
+    return languageMap[ext] || 'typescript';
   };
 
   if (isLoading) {
@@ -84,12 +69,20 @@ export function CodeEditor({ file, streamingContent, isLoading }: CodeEditorProp
           <span className="text-sm text-neutral-400 font-mono">{file.path}</span>
         </div>
       )}
-      <div className="flex-1 overflow-auto">
-        <pre className="p-4 text-sm font-mono text-neutral-300">
-          <code className={`language-${getLanguage(getFileExtension(file?.path))}`}>
-            {content || ''}
-          </code>
-        </pre>
+      <div className="flex-1">
+        <Editor
+          height="100%"
+          language={getLanguage(getFileExtension(file?.path))}
+          theme="vs-dark"
+          value={content}
+          options={{
+            readOnly: true,
+            minimap: { enabled: false },
+            fontSize: 14,
+            wordWrap: 'on',
+            scrollBeyondLastLine: false,
+          }}
+        />
       </div>
     </div>
   );

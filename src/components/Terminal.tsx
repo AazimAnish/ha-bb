@@ -11,7 +11,6 @@ interface TerminalProps {
     webContainer: WebContainer | null;
     onOutput?: (output: string) => void;
     onStepComplete?: (step: BuildStep) => void;
-    onFileChange?: (path: string, content: string) => void;
 }
 
 interface TerminalTabProps {
@@ -46,7 +45,7 @@ function TerminalTabs({ activeTab, onTabChange }: TerminalTabProps) {
     );
 }
 
-export function Terminal({ webContainer, onOutput, onStepComplete, onFileChange }: TerminalProps) {
+export function Terminal({ webContainer, onOutput, onStepComplete }: TerminalProps) {
     const [activeTerminal, setActiveTerminal] = useState<'ai' | 'user'>('ai');
     const aiTerminalRef = useRef<HTMLDivElement>(null);
     const userTerminalRef = useRef<HTMLDivElement>(null);
@@ -111,7 +110,13 @@ export function Terminal({ webContainer, onOutput, onStepComplete, onFileChange 
             }
         });
 
+        aiTerminal.write('\r\n🚀 Starting development environment...\r\n');
+
+        aiTerminal.write('\r\n🔄 Initializing WebContainer environment...\r\n');
+        console.log('Terminal initialization complete, waiting for WebContainer...');
+
         return () => {
+            console.log('Cleaning up terminal instances');
             aiTerminal.dispose();
             userTerminal.dispose();
         };
@@ -135,183 +140,6 @@ export function Terminal({ webContainer, onOutput, onStepComplete, onFileChange 
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Move helper functions to component scope
-    const initFS = async () => {
-        try {
-            await webContainer?.fs.mkdir('/.npm-cache', { recursive: true });
-            await webContainer?.spawn('jsh', ['-c', 'chmod -R 777 /.npm-cache']);
-            
-            await webContainer?.fs.mkdir('/app', { recursive: true });
-            await webContainer?.fs.mkdir('/app/src', { recursive: true });
-            
-            await webContainer?.spawn('jsh', ['-c', 'chmod -R 777 /app']);
-            await webContainer?.spawn('jsh', ['-c', 'chown -R 1:1 /.npm-cache']);
-            
-        } catch (error) {
-            if (!(error instanceof Error) || !error.message.includes('EEXIST')) {
-                console.warn('Directory creation warning:', error);
-                throw error;
-            }
-        }
-    };
-
-    // Add a function to display file creation in AI terminal
-    const displayFileCreation = (aiTerminal: XTerm, path: string) => {
-        aiTerminal.write(`\r\n📝 Creating file: ${path}\r\n`);
-    };
-
-    // Update the writeFile function to show progress
-    const writeFile = async (path: string, content: string) => {
-        try {
-            const aiTerminal = aiXtermRef.current;
-            if (aiTerminal) {
-                displayFileCreation(aiTerminal, path);
-            }
-
-            const dirPath = path.split('/').slice(0, -1).join('/');
-            if (dirPath) {
-                await webContainer?.fs.mkdir(dirPath, { recursive: true });
-            }
-            
-            await webContainer?.fs.writeFile(path, content, {
-                encoding: 'utf-8',
-            });
-            
-            await webContainer?.spawn('jsh', ['-c', `chmod 666 ${path}`]);
-            
-            // Notify with relative path for display in CodeEditor
-            const relativePath = path.replace('/app/', '');
-            onFileChange?.(relativePath, content);
-
-            // Show success message
-            if (aiTerminal) {
-                aiTerminal.write(`\r\n✅ Created: ${path}\r\n`);
-            }
-        } catch (error) {
-            console.error(`Failed to write file ${path}:`, error);
-            if (aiXtermRef.current) {
-                aiXtermRef.current.write(`\r\n❌ Error creating ${path}: ${error}\r\n`);
-            }
-            throw error;
-        }
-    };
-
-    // Add a function to install dependencies and start server
-    const setupProject = async (aiInput: WritableStreamDefaultWriter) => {
-        const aiTerminal = aiXtermRef.current;
-        if (!aiTerminal) return;
-
-        try {
-            aiTerminal.write('\r\n📦 Installing dependencies...\r\n');
-            await aiInput.write('cd /app && npm install\n');
-
-            aiTerminal.write('\r\n🚀 Starting development server...\r\n');
-            await aiInput.write('cd /app && npm run dev\n');
-        } catch (error) {
-            console.error('Failed to setup project:', error);
-            aiTerminal.write(`\r\n❌ Setup error: ${error}\r\n`);
-        }
-    };
-
-    // Initialize shell and project
-    useEffect(() => {
-        if (!webContainer || !aiXtermRef.current || !userXtermRef.current || initRef.current) return;
-        initRef.current = true;
-
-        async function startShell() {
-            const aiTerminal = aiXtermRef.current!;
-            const userTerminal = userXtermRef.current!;
-
-            try {
-                await initFS();
-
-                // Start shell processes
-                const startShellProcess = async (terminal: XTerm) => {
-                    try {
-                        const process = await webContainer?.spawn('jsh', {
-                            terminal: {
-                                cols: terminal.cols,
-                                rows: terminal.rows,
-                            },
-                            env: {
-                                HOME: '/app',
-                                PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                                TERM: 'xterm-256color',
-                                npm_config_cache: '/.npm-cache',
-                                USER: '1',
-                                npm_config_user: '1'
-                            }
-                        });
-                        
-                        if (!process) {
-                            throw new Error('Failed to start shell process');
-                        }
-                        
-                        return process;
-                    } catch (error) {
-                        console.error('Shell process error:', error);
-                        terminal.write(`\r\n❌ Failed to start shell: ${error}\r\n`);
-                        throw error;
-                    }
-                };
-
-                // Start terminals
-                const userShellProcess = await startShellProcess(userTerminal);
-                if (!userShellProcess) return;
-                shellProcessRef.current = userShellProcess;
-
-                const aiShellProcess = await startShellProcess(aiTerminal);
-                if (!aiShellProcess) return;
-
-                // Connect terminal streams
-                userShellProcess.output.pipeTo(
-                    new WritableStream({
-                        write(data) {
-                            userTerminal.write(data);
-                            onOutput?.(data);
-                        },
-                    })
-                );
-
-                aiShellProcess.output.pipeTo(
-                    new WritableStream({
-                        write(data) {
-                            aiTerminal.write(data);
-                        },
-                    })
-                );
-
-                const aiInput = aiShellProcess.input.getWriter();
-                userInputWriterRef.current = userShellProcess.input.getWriter();
-
-                // Handle user input
-                userTerminal.onData((data) => {
-                    if (activeTerminal === 'user' && userInputWriterRef.current) {
-                        userInputWriterRef.current.write(data);
-                    }
-                });
-
-                // Show ready message
-                aiTerminal.write('\r\n🔧 Environment ready for file creation...\r\n');
-
-                // Server ready event handler
-                webContainer?.on('server-ready', (port, url) => {
-                    aiTerminal.write(`\r\n🌎 Server running at ${url}\r\n`);
-                    onOutput?.(`Server running at ${url}`);
-                });
-
-                // Setup project after files are created
-                await setupProject(aiInput);
-
-            } catch (error) {
-                console.error('Terminal error:', error);
-                aiTerminal.write(`\r\n❌ Error: ${error}\r\n`);
-            }
-        }
-
-        startShell();
-    }, [webContainer, onOutput, onStepComplete, activeTerminal]);
-
     // Handle terminal focus
     useEffect(() => {
         if (activeTerminal === 'user') {
@@ -321,128 +149,52 @@ export function Terminal({ webContainer, onOutput, onStepComplete, onFileChange 
         }
     }, [activeTerminal]);
 
-    const saveToSupabase = async (files: Record<string, string>, userId: string) => {
-        try {
-            const { data, error } = await supabase
-                .from('projects')
-                .insert([
-                    {
-                        user_id: userId,
-                        files: files,
-                        created_at: new Date().toISOString()
-                    }
-                ])
-                .select()
-                .single();
+    // Initialize shell and project
+    useEffect(() => {
+        if (!webContainer || !aiXtermRef.current || initRef.current) return;
+        initRef.current = true;
 
-            if (error) throw error;
-            return data as Project;
-        } catch (error) {
-            console.error('Error saving to Supabase:', error);
-            throw error;
-        }
-    };
-
-    const saveFiles = async (userId: string) => {
-        try {
-            const files: Record<string, string> = {};
-            const processedPaths = new Set<string>();
+        async function startShell() {
+            const terminal = aiXtermRef.current!;
             
-            // Helper function to recursively read directory
-            const readDirRecursive = async (path: string) => {
-                const entries = await webContainer?.fs.readdir(path);
-                if (!entries) return;
+            try {
+                if (!webContainer) return;
 
-                for (const entry of entries) {
-                    const fullPath = `${path}/${entry}`;
-                    
-                    try {
-                        // Try to read as directory first
-                        await webContainer?.fs.readdir(fullPath);
-                        await readDirRecursive(fullPath);
-                    } catch {
-                        // If fails, it's a file - read it
-                        if (!processedPaths.has(fullPath)) {
-                            const content = await webContainer?.fs.readFile(fullPath, 'utf-8');
-                            if (content) {
-                                // Store relative path by removing /app prefix
-                                const relativePath = fullPath.replace('/app/', '');
-                                files[relativePath] = content;
-                                processedPaths.add(fullPath);
-                            }
-                        }
-                    }
-                }
-            };
+                // Start shell first
+                const shellProcess = await webContainer.spawn('jsh', {
+                    terminal: {
+                        cols: terminal.cols,
+                        rows: terminal.rows,
+                    },
+                });
+                shellProcessRef.current = shellProcess;
 
-            await readDirRecursive('/app');
+                // Connect streams
+                const outputWriter = new WritableStream({
+                    write(data) {
+                        terminal.write(data);
+                        onOutput?.(data);
+                    },
+                });
+                shellProcess.output.pipeTo(outputWriter);
 
-            // Batch save to Supabase with compression
-            const compressedFiles = Object.entries(files).reduce((acc, [path, content]) => {
-                // Skip node_modules, build files, and other large directories
-                if (
-                    !path.includes('node_modules') && 
-                    !path.includes('dist') && 
-                    !path.includes('.git')
-                ) {
-                    acc[path] = content;
-                }
-                return acc;
-            }, {} as Record<string, string>);
+                const input = shellProcess.input.getWriter();
+                terminal.onData((data) => input.write(data));
 
-            // Save to Supabase with metadata
-            const { data, error } = await supabase
-                .from('projects')
-                .insert([
-                    {
-                        user_id: userId,
-                        files: compressedFiles,
-                        created_at: new Date().toISOString(),
-                        metadata: {
-                            file_count: Object.keys(compressedFiles).length,
-                            total_size: JSON.stringify(compressedFiles).length,
-                            timestamp: Date.now()
-                        }
-                    }
-                ])
-                .select()
-                .single();
+                // Let PreviewFrame handle file creation
+                terminal.write('🚀 Starting development environment...\n');
+                
+                onStepComplete?.(BuildStep.CREATE);
+                onStepComplete?.(BuildStep.IMPLEMENT);
 
-            if (error) throw error;
-            return data as Project;
-
-        } catch (error) {
-            console.error('Error saving files:', error);
-            throw error;
-        }
-    };
-
-    const loadFiles = async (projectId: string) => {
-        try {
-            const { data: project, error } = await supabase
-                .from('projects')
-                .select('*')
-                .eq('id', projectId)
-                .single();
-
-            if (error) throw error;
-            if (!project) throw new Error('Project not found');
-
-            await initFS();
-
-            // Type assertion to ensure project.files is Record<string, string>
-            const files = project.files as Record<string, string>;
-            for (const [path, content] of Object.entries(files)) {
-                const fullPath = `/app/${path}`;
-                await writeFile(fullPath, content);
+            } catch (error) {
+                console.error('Terminal error:', error);
+                terminal.write(`\r\n❌ Error: ${error}\r\n`);
             }
-
-            return project;
-        } catch (error) {
-            console.error('Error loading files:', error);
-            throw error;
         }
-    };
+
+        startShell();
+    }, [webContainer, onOutput, onStepComplete]);
 
     return (
         <div className="h-full flex flex-col">

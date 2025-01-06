@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { StepsList } from '@/components/StepList';
 import { FileExplorer } from '@/components/FileExplorer';
@@ -623,6 +623,11 @@ export default defineConfig({
     setCurrentStep(stepId);
   };
 
+  // Memoize the output handler
+  const handleOutput = useCallback((output: string) => {
+    setStreamingContent(prev => prev + output);
+  }, []); // Empty dependency array since we only need to create this once
+
   return (
     <div className="min-h-screen bg-black flex flex-col">
       {error && (
@@ -694,7 +699,8 @@ export default defineConfig({
                     <PreviewFrame 
                       webContainer={webcontainer?.webcontainer}
                       files={files}
-                      isLoading={loading && !templateSet}
+                      isLoading={loading}
+                      onOutput={handleOutput}
                     />
                   )}
                 </div>
@@ -709,7 +715,7 @@ export default defineConfig({
                 {webcontainer?.webcontainer && (
                   <Terminal 
                     webContainer={webcontainer.webcontainer}
-                    onOutput={(output) => setStreamingContent(prev => prev + output)}
+                    onOutput={handleOutput}
                     onStepComplete={handleStepComplete}
                     onFileChange={handleFileChange}
                   />
