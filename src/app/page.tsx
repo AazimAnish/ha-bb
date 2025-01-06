@@ -21,7 +21,7 @@ const HomePage = () => {
     setIsGenerating(true);
     // Simulate generation delay
     await new Promise(resolve => setTimeout(resolve, 1500));
-    router.push(`/generate?prompt=${encodeURIComponent(prompt)}`);
+    router.push(`/generator?prompt=${encodeURIComponent(prompt)}`);
   };
 
   const words = [
