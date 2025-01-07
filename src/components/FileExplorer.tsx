@@ -1,33 +1,33 @@
 import React, { useState } from 'react';
 import { FolderTree, File, ChevronRight, ChevronDown } from 'lucide-react';
-import { FileItem } from '../types';
-
-interface FileExplorerProps {
-  files: FileItem[];
-  onFileSelect: (file: FileItem) => void;
-}
+import { FileExplorerProps, FileItem } from '@/types';
 
 interface FileNodeProps {
   item: FileItem;
   depth: number;
-  onFileClick: (file: FileItem) => void;
+  onSelect: (file: FileItem) => void;
+  selected?: string;
 }
 
-function FileNode({ item, depth, onFileClick }: FileNodeProps) {
+function FileNode({ item, depth, onSelect, selected }: FileNodeProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleClick = () => {
     if (item.type === 'folder') {
       setIsExpanded(!isExpanded);
     } else {
-      onFileClick(item);
+      onSelect(item);
     }
   };
+
+  const isSelected = selected === item.path;
 
   return (
     <div className="select-none">
       <div
-        className="flex items-center gap-2 p-2 hover:bg-[#F14A00]/10 rounded-md cursor-pointer"
+        className={`flex items-center gap-2 p-2 hover:bg-[#F14A00]/10 rounded-md cursor-pointer ${
+          isSelected ? 'bg-[#F14A00]/20' : ''
+        }`}
         style={{ paddingLeft: `${depth * 1.5}rem` }}
         onClick={handleClick}
       >
@@ -54,7 +54,8 @@ function FileNode({ item, depth, onFileClick }: FileNodeProps) {
               key={`${child.path}-${index}`}
               item={child}
               depth={depth + 1}
-              onFileClick={onFileClick}
+              onSelect={onSelect}
+              selected={selected}
             />
           ))}
         </div>
@@ -63,7 +64,7 @@ function FileNode({ item, depth, onFileClick }: FileNodeProps) {
   );
 }
 
-export function FileExplorer({ files, onFileSelect }: FileExplorerProps) {
+export function FileExplorer({ files, onSelect, selected }: FileExplorerProps) {
   return (
     <div className="bg-black border border-[#F14A00]/20 rounded-lg shadow-lg p-4 h-full overflow-auto">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-white">
@@ -76,7 +77,8 @@ export function FileExplorer({ files, onFileSelect }: FileExplorerProps) {
             key={`${file.path}-${index}`}
             item={file}
             depth={0}
-            onFileClick={onFileSelect}
+            onSelect={onSelect}
+            selected={selected}
           />
         ))}
       </div>

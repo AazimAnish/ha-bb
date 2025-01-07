@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from "framer-motion";
 import { Spotlight } from "@/components/ui/spotlight";
 import { TypewriterEffectSmooth } from "@/components/ui/typewriter-effect";
@@ -9,11 +9,31 @@ import { Input } from "@/components/ui/input";
 import { useRouter } from 'next/navigation';
 import { Loader2 } from "lucide-react";
 import { SparklesCore } from "@/components/ui/sparkles";
+import { supabase } from '@/lib/supabase';
+import { Project } from '@/types';
 
 const HomePage = () => {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+
+  useEffect(() => {
+    async function loadProjects() {
+      const { data } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setProjects(data);
+      }
+      setIsLoadingProjects(false);
+    }
+
+    loadProjects();
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -134,6 +154,31 @@ const HomePage = () => {
                 </Button>
               </motion.div>
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="mt-8 text-center"
+          >
+            <p className="text-gray-400 mb-4">or select an existing project</p>
+            <select
+              className="bg-gray-900/50 backdrop-blur-sm text-gray-100 px-4 py-2 rounded-lg border border-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#F14A00] focus:border-transparent transition-all duration-200 max-w-md"
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id) {
+                  router.push(`/generator?projectId=${id}`);
+                }
+              }}
+            >
+              <option value="">Select Existing Project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.prompt.substring(0, 50)}...
+                </option>
+              ))}
+            </select>
           </motion.div>
         </motion.div>
       </div>
