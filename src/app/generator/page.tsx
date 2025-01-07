@@ -138,11 +138,11 @@ export default function GeneratorPage() {
       const id = searchParams.get('projectId');
       if (id) {
         try {
-          setProjectId(id);
-          const project = await getProject(id);
-          if (project) {
-            setFiles(project.files);
-            setLlmMessages(project.llm_messages);
+        setProjectId(id);
+        const project = await getProject(id);
+        if (project) {
+          setFiles(project.files);
+          setLlmMessages(project.llm_messages);
             setCurrentStep(project.current_step || 1);
             if (project.prompt) {
               setUserPrompt(project.prompt);
@@ -192,7 +192,7 @@ export default function GeneratorPage() {
       // Save project if exists
       if (projectId) {
         await updateProject(projectId, {
-          files,
+            files,
           llm_messages: llmMessages,
           current_step: currentStep
         });
@@ -282,14 +282,14 @@ export default function GeneratorPage() {
 
   return (
     <div className="flex flex-col h-screen">
-      <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={20} minSize={15}>
-          <FileExplorer
-            files={files}
+                  <FileExplorer 
+                    files={files} 
             onSelect={handleFileSelect}
             selected={selectedFile?.path}
           />
-        </ResizablePanel>
+          </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={60}>
           <TabView
@@ -297,16 +297,16 @@ export default function GeneratorPage() {
             onChange={setActiveTab}
             tabs={{
               code: (
-                <CodeEditor
-                  file={selectedFile}
+                  <CodeEditor 
+                    file={selectedFile} 
                   onSave={handleFileChange}
                   readOnly={loading}
-                />
+                  />
               ),
               preview: (
-                <PreviewFrame
-                  webContainer={webcontainer}
-                  files={files}
+                  <PreviewFrame 
+                    webContainer={webcontainer} 
+                    files={files}
                   isLoading={loading || isBooting}
                 />
               )
@@ -320,8 +320,8 @@ export default function GeneratorPage() {
             currentStep={currentStep}
             onStepClick={handleStepClick}
           />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       <Terminal
         webContainer={webcontainer}
         isLoading={loading || isBooting}
