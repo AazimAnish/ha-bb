@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { StepsList } from '@/components/StepList';
 import { FileExplorer } from '@/components/FileExplorer';
@@ -13,7 +13,8 @@ import {
   StepType, 
   Message, 
   FileOperation, 
-  FileSystemTree 
+  FileSystemTree,
+  StepStatus 
 } from '@/types';
 import { Loader } from '@/components/Loader';
 import { useWebContainer } from '@/hooks/useWebContainer';
@@ -25,14 +26,14 @@ import { saveProject, getProject, updateProject } from '@/lib/supabase';
 import { ProjectSelector } from '@/components/ProjectSelector';
 import { toast } from '@/components/ui/use-toast';
 
-const STEP_STATUS = {
+const STEP_STATUS: Record<string, StepStatus> = {
   PENDING: 'pending',
   IN_PROGRESS: 'in-progress',
   COMPLETED: 'completed',
   FAILED: 'failed'
 } as const;
 
-export default function GeneratorPage() {
+function GeneratorContent() {
   const searchParams = useSearchParams();
   const prompt = searchParams.get('prompt');
   const [userPrompt, setUserPrompt] = useState("");
@@ -282,14 +283,14 @@ export default function GeneratorPage() {
 
   return (
     <div className="flex flex-col h-screen">
-        <ResizablePanelGroup direction="horizontal">
+      <ResizablePanelGroup direction="horizontal">
         <ResizablePanel defaultSize={20} minSize={15}>
-                  <FileExplorer 
-                    files={files} 
+          <FileExplorer 
+            files={files} 
             onSelect={handleFileSelect}
             selected={selectedFile?.path}
           />
-          </ResizablePanel>
+        </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={60}>
           <TabView
@@ -297,16 +298,16 @@ export default function GeneratorPage() {
             onChange={setActiveTab}
             tabs={{
               code: (
-                  <CodeEditor 
-                    file={selectedFile} 
+                <CodeEditor 
+                  file={selectedFile} 
                   onSave={handleFileChange}
                   readOnly={loading}
-                  />
+                />
               ),
               preview: (
-                  <PreviewFrame 
-                    webContainer={webcontainer} 
-                    files={files}
+                <PreviewFrame 
+                  webContainer={webcontainer} 
+                  files={files}
                   isLoading={loading || isBooting}
                 />
               )
@@ -320,13 +321,28 @@ export default function GeneratorPage() {
             currentStep={currentStep}
             onStepClick={handleStepClick}
           />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        </ResizablePanel>
+      </ResizablePanelGroup>
       <Terminal
         webContainer={webcontainer}
         isLoading={loading || isBooting}
       />
       {loading && <Loader />}
     </div>
+  );
+}
+
+export default function GeneratorPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen bg-neutral-900">
+        <div className="text-center">
+          <Loader className="w-8 h-8 mb-4 animate-spin text-neutral-400" />
+          <p className="text-sm text-neutral-400">Loading generator...</p>
+        </div>
+      </div>
+    }>
+      <GeneratorContent />
+    </Suspense>
   );
 }
