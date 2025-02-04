@@ -14,6 +14,8 @@ import { parseXml } from '@/lib/steps';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 import { BuildStep, createBuildStep } from '@/lib/steps';
 import { PreviewFrame } from '@/components/PreviewFrame';
+import { SidebarTabs } from '@/components/SidebarTabs';
+import { ExplorerTabs } from '@/components/ExplorerTabs';
 
 interface Message {
   role: "user" | "assistant";
@@ -38,6 +40,8 @@ export default function GeneratorPage() {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [currentFile, setCurrentFile] = useState<{path: string; content: string} | null>(null);
   const [currentBuildStep, setCurrentBuildStep] = useState<Step | null>(null);
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'explorer' | 'chat'>('explorer');
+  const [activeExplorerTab, setActiveExplorerTab] = useState<'files' | 'steps'>('steps');
 
   useEffect(() => {
     let originalFiles = [...files];
@@ -651,47 +655,76 @@ export default defineConfig({
       <ResizablePanelGroup direction="horizontal">
         {/* Left Sidebar */}
         <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-          <div className="h-screen border-r border-neutral-800 overflow-auto">
-            <div className="p-4">
-              <h1 className="text-xl font-semibold text-white mb-4">Build Steps</h1>
+          <div className="h-screen border-r border-neutral-800 overflow-hidden flex flex-col">
+            <div className="p-4 flex-1 overflow-hidden flex flex-col">
+              <h1 className="text-xl font-semibold text-white mb-4">Project</h1>
               
-              {/* Steps and Files Combined View */}
-              <div className="space-y-4">
-                <StepsList
-                  steps={steps}
-                  currentStep={currentBuildStep?.id || 0}
-                  onStepClick={handleStepClick}
+              {/* Top Section with Tabs */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <ExplorerTabs 
+                  activeTab={activeExplorerTab} 
+                  onTabChange={setActiveExplorerTab} 
                 />
-                <FileExplorer 
-                  files={files} 
-                  onFileSelect={handleFileSelect}
-                />
-              </div>
 
-              {/* Prompt Input */}
-              {!(loading || !templateSet) && (
-                <div className="mt-4">
-                  <textarea 
-                    value={userPrompt} 
-                    onChange={(e) => setUserPrompt(e.target.value)}
-                    className="w-full h-24 bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-white resize-none"
-                    placeholder="Enter additional instructions..."
-                  />
-                  <button 
-                    onClick={handleSendPrompt}
-                    className="mt-2 w-full bg-[#F14A00] hover:bg-[#D93F00] text-white px-4 py-2 rounded-lg transition-colors duration-200"
-                  >
-                    Send
-                  </button>
+                {/* File Explorer/Build Steps Area */}
+                <div className="flex-1 overflow-auto mb-4">
+                  {activeExplorerTab === 'steps' ? (
+                    <StepsList
+                      steps={steps}
+                      currentStep={currentBuildStep?.id || 0}
+                      onStepClick={handleStepClick}
+                    />
+                  ) : (
+                    <FileExplorer 
+                      files={files} 
+                      onFileSelect={handleFileSelect}
+                    />
+                  )}
                 </div>
-              )}
+
+                {/* AI Chat Section - Always Visible */}
+                <div className="border-t border-neutral-800 pt-4">
+                  <div className="mb-4 h-48 overflow-auto bg-neutral-900/50 rounded-lg p-2">
+                    {llmMessages.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={`mb-2 ${
+                          msg.role === 'assistant' ? 'text-[#F14A00]' : 'text-white'
+                        }`}
+                      >
+                        <span className="font-bold">
+                          {msg.role === 'assistant' ? '🤖 AI: ' : '👤 You: '}
+                        </span>
+                        {msg.content}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={userPrompt}
+                      onChange={(e) => setUserPrompt(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleSendPrompt()}
+                      className="flex-1 bg-neutral-800 text-white px-4 py-2 rounded-md"
+                      placeholder="Ask AI to modify your code..."
+                    />
+                    <button
+                      onClick={handleSendPrompt}
+                      className="px-4 py-2 bg-[#F14A00] text-white rounded-md hover:bg-[#D93F00]"
+                      disabled={loading || !templateSet}
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </ResizablePanel>
 
         <ResizableHandle />
 
-        {/* Main Content */}
+        {/* Main Content - Right Side */}
         <ResizablePanel defaultSize={80}>
           <ResizablePanelGroup direction="vertical">
             {/* Code/Preview Area */}
@@ -703,7 +736,7 @@ export default defineConfig({
                     <CodeEditor 
                       file={selectedFile} 
                       streamingContent={streamingContent}
-                      isLoading={loading && !templateSet}
+                      isLoading={loading}
                     />
                   ) : (
                     <PreviewFrame 

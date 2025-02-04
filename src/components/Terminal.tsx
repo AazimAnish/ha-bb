@@ -1,67 +1,31 @@
-import React, { useEffect, useRef, useState } from 'react';
+'use client';
+
+import React, { useEffect, useRef } from 'react';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebContainer, WebContainerProcess } from '@webcontainer/api';
 import 'xterm/css/xterm.css';
 import { BuildStep } from '../lib/steps';
-import { supabase } from '../lib/supabase';
-import { Project } from '../types/index';
 
 interface TerminalProps {
     webContainer: WebContainer | null;
     onOutput?: (output: string) => void;
     onStepComplete?: (step: BuildStep) => void;
+    onFileChange: (path: string, content: string) => void;
 }
 
-interface TerminalTabProps {
-    activeTab: 'ai' | 'user';
-    onTabChange: (tab: 'ai' | 'user') => void;
-}
-
-function TerminalTabs({ activeTab, onTabChange }: TerminalTabProps) {
-    return (
-        <div className="flex space-x-2 mb-4">
-            <button
-                onClick={() => onTabChange('ai')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                    activeTab === 'ai'
-                        ? 'bg-[#F14A00]/20 text-[#F14A00] border border-[#F14A00]/30'
-                        : 'text-gray-400 hover:text-white hover:bg-[#F14A00]/10'
-                }`}
-            >
-                🤖 AI Terminal
-            </button>
-            <button
-                onClick={() => onTabChange('user')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                    activeTab === 'user'
-                        ? 'bg-[#F14A00]/20 text-white border border-[#F14A00]/30'
-                        : 'text-gray-400 hover:text-white hover:bg-[#F14A00]/10'
-                }`}
-            >
-                👤 User Terminal
-            </button>
-        </div>
-    );
-}
-
-export function Terminal({ webContainer, onOutput, onStepComplete }: TerminalProps) {
-    const [activeTerminal, setActiveTerminal] = useState<'ai' | 'user'>('ai');
-    const aiTerminalRef = useRef<HTMLDivElement>(null);
-    const userTerminalRef = useRef<HTMLDivElement>(null);
-    const aiXtermRef = useRef<XTerm | null>(null);
-    const userXtermRef = useRef<XTerm | null>(null);
+export function Terminal({ webContainer, onOutput, onStepComplete, onFileChange }: TerminalProps) {
+    const terminalRef = useRef<HTMLDivElement>(null);
+    const xtermRef = useRef<XTerm | null>(null);
     const shellProcessRef = useRef<WebContainerProcess | null>(null);
-    const aiFitAddonRef = useRef<FitAddon | null>(null);
-    const userFitAddonRef = useRef<FitAddon | null>(null);
+    const fitAddonRef = useRef<FitAddon | null>(null);
     const initRef = useRef<boolean>(false);
-    const userInputWriterRef = useRef<WritableStreamDefaultWriter | null>(null);
 
-    // Initialize terminals
+    // Initialize terminal
     useEffect(() => {
-        if (!aiTerminalRef.current || !userTerminalRef.current) return;
+        if (!terminalRef.current) return;
 
-        const aiTerminal = new XTerm({
+        const terminal = new XTerm({
             convertEol: true,
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             fontSize: 14,
@@ -72,66 +36,42 @@ export function Terminal({ webContainer, onOutput, onStepComplete }: TerminalPro
             cursorBlink: true,
         });
 
-        const userTerminal = new XTerm({
-            convertEol: true,
-            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-            fontSize: 14,
-            theme: {
-                background: '#000000',
-                foreground: '#ffffff',
-            },
-            cursorBlink: true,
-        });
-
-        const aiFitAddon = new FitAddon();
-        const userFitAddon = new FitAddon();
-
-        aiFitAddonRef.current = aiFitAddon;
-        userFitAddonRef.current = userFitAddon;
-
-        aiTerminal.loadAddon(aiFitAddon);
-        userTerminal.loadAddon(userFitAddon);
+        const fitAddon = new FitAddon();
+        fitAddonRef.current = fitAddon;
+        terminal.loadAddon(fitAddon);
 
         requestAnimationFrame(() => {
-            if (aiTerminalRef.current && userTerminalRef.current) {
-                aiTerminal.open(aiTerminalRef.current);
-                userTerminal.open(userTerminalRef.current);
-                aiFitAddon.fit();
-                userFitAddon.fit();
+            if (terminalRef.current) {
+                terminal.open(terminalRef.current);
+                fitAddon.fit();
             }
         });
 
-        aiXtermRef.current = aiTerminal;
-        userXtermRef.current = userTerminal;
-
-        userTerminalRef.current.addEventListener('click', () => {
-            if (activeTerminal === 'user') {
-                userXtermRef.current?.focus();
-            }
-        });
-
-        aiTerminal.write('\r\n🚀 Starting development environment...\r\n');
-
-        aiTerminal.write('\r\n🔄 Initializing WebContainer environment...\r\n');
-        console.log('Terminal initialization complete, waiting for WebContainer...');
+        xtermRef.current = terminal;
+        terminal.write('\r\n🚀 Starting development environment...\r\n');
+        terminal.write('\r\n🔄 Initializing WebContainer environment...\r\n');
 
         return () => {
-            console.log('Cleaning up terminal instances');
-            aiTerminal.dispose();
-            userTerminal.dispose();
+            if (shellProcessRef.current) {
+                try {
+                    shellProcessRef.current.kill();
+                } catch (e) {
+                    console.error('Error killing process:', e);
+                }
+            }
+            terminal.dispose();
         };
-    }, [activeTerminal]);
+    }, []);
 
     // Handle window resize
     useEffect(() => {
         function handleResize() {
-            aiFitAddonRef.current?.fit();
-            userFitAddonRef.current?.fit();
+            fitAddonRef.current?.fit();
 
-            if (shellProcessRef.current && userXtermRef.current) {
+            if (shellProcessRef.current && xtermRef.current) {
                 shellProcessRef.current.resize({
-                    cols: userXtermRef.current.cols,
-                    rows: userXtermRef.current.rows,
+                    cols: xtermRef.current.cols,
+                    rows: xtermRef.current.rows,
                 });
             }
         }
@@ -140,82 +80,123 @@ export function Terminal({ webContainer, onOutput, onStepComplete }: TerminalPro
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Handle terminal focus
+    // Initialize Next.js project
     useEffect(() => {
-        if (activeTerminal === 'user') {
-            userXtermRef.current?.focus();
-        } else {
-            aiXtermRef.current?.focus();
-        }
-    }, [activeTerminal]);
+        if (!webContainer || !xtermRef.current || initRef.current) return;
 
-    // Initialize shell and project
-    useEffect(() => {
-        if (!webContainer || !aiXtermRef.current || initRef.current) return;
-        initRef.current = true;
+        async function initNextJS() {
+            const terminal = xtermRef.current!;
 
-        async function startShell() {
-            const terminal = aiXtermRef.current!;
-            
             try {
-                if (!webContainer) return;
+                terminal.write('🚀 Initializing Next.js project...\r\n');
 
-                // Start shell first
-                const shellProcess = await webContainer.spawn('jsh', {
-                    terminal: {
-                        cols: terminal.cols,
-                        rows: terminal.rows,
+                // Create package.json first
+                await webContainer?.fs.writeFile('package.json', JSON.stringify({
+                    name: 'next-app',
+                    version: '0.1.0',
+                    private: true,
+                    scripts: {
+                        dev: 'next dev',
+                        build: 'next build',
+                        start: 'next start'
                     },
-                });
-                shellProcessRef.current = shellProcess;
-
-                // Connect streams
-                const outputWriter = new WritableStream({
-                    write(data) {
-                        terminal.write(data);
-                        onOutput?.(data);
+                    dependencies: {
+                        'next': '^14.1.0',
+                        'react': '^18.2.0',
+                        'react-dom': '^18.2.0'
                     },
+                    devDependencies: {
+                        '@types/node': '^20',
+                        '@types/react': '^18',
+                        '@types/react-dom': '^18',
+                        'typescript': '^5',
+                        'autoprefixer': '^10.0.1',
+                        'postcss': '^8',
+                        'tailwindcss': '^3.3.0'
+                    }
+                }, null, 2));
+
+                // Install dependencies with progress tracking
+                terminal.write('📦 Installing dependencies...\r\n');
+                const installProcess = await webContainer?.spawn('npm', ['install'], {
+                    output: true
                 });
-                shellProcess.output.pipeTo(outputWriter);
 
-                const input = shellProcess.input.getWriter();
-                terminal.onData((data) => input.write(data));
+                if (!installProcess) {
+                    throw new Error('Failed to start npm install process');
+                }
 
-                // Let PreviewFrame handle file creation
-                terminal.write('🚀 Starting development environment...\n');
-                
-                onStepComplete?.(BuildStep.CREATE);
-                onStepComplete?.(BuildStep.IMPLEMENT);
+                await new Promise((resolve, reject) => {
+                    installProcess.output.pipeTo(
+                        new WritableStream({
+                            write(data) {
+                                terminal.write(data);
+                                onOutput?.(data);
+                            },
+                            close() {
+                                resolve(undefined);
+                            }
+                        })
+                    ).catch(reject);
+                });
+
+                // Start dev server
+                terminal.write('\r\n🚀 Starting Next.js development server...\r\n');
+                const devProcess = await webContainer?.spawn('npm', ['run', 'dev'], {
+                    output: true
+                });
+
+                if (!devProcess) {
+                    throw new Error('Failed to start development server');
+                }
+
+                shellProcessRef.current = devProcess;
+
+                // Listen for server ready event
+                if (webContainer) {
+                    webContainer.on('server-ready', (port, url) => {
+                        terminal.write(`\r\n🌎 Server ready at ${url}\r\n`);
+                        onStepComplete?.(BuildStep.IMPLEMENT);
+                    });
+                }
+
+                devProcess.output.pipeTo(
+                    new WritableStream({
+                        write(data) {
+                            terminal.write(data);
+                            onOutput?.(data);
+                        }
+                    })
+                );
+
+                initRef.current = true;
 
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
                 console.error('Terminal error:', error);
-                terminal.write(`\r\n❌ Error: ${error}\r\n`);
+                terminal.write(`\r\n❌ Error: ${errorMessage}\r\n`);
             }
         }
 
-        startShell();
-    }, [webContainer, onOutput, onStepComplete]);
+        initNextJS();
+
+        return () => {
+            if (shellProcessRef.current) {
+                try {
+                    shellProcessRef.current.kill();
+                } catch (e) {
+                    console.error('Error killing process:', e);
+                }
+            };
+        };
+    }, [webContainer, onOutput, onStepComplete, onFileChange]);
 
     return (
-        <div className="h-full flex flex-col">
-            <TerminalTabs
-                activeTab={activeTerminal}
-                onTabChange={setActiveTerminal}
+        <div className="h-full relative">
+            <div
+                ref={terminalRef}
+                className="absolute inset-0 bg-[#1a1a1a]"
             />
-            <div className="flex-1 relative">
-                <div
-                    ref={aiTerminalRef}
-                    className={`absolute inset-0 bg-[#1a1a1a] transition-opacity duration-200 ${
-                        activeTerminal === 'ai' ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                    }`}
-                />
-                <div
-                    ref={userTerminalRef}
-                    className={`absolute inset-0 bg-black transition-opacity duration-200 ${
-                        activeTerminal === 'user' ? 'opacity-100 z-10' : 'opacity-0 z-0'
-                    }`}
-                />
-            </div>
         </div>
     );
 }

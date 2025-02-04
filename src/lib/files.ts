@@ -1,4 +1,4 @@
-import { FileSystemTree } from '@webcontainer/api';
+import { FileSystemTree, WebContainer } from '@webcontainer/api';
 
 export const initialFiles: FileSystemTree = {
   'package.json': {
@@ -11,7 +11,18 @@ export const initialFiles: FileSystemTree = {
           build: "next build",
           start: "next start",
           lint: "next lint"
-        }
+        },
+        dependencies: {
+          "next": "^14.0.0",
+          "react": "^18.0.0",
+          "react-dom": "^18.0.0"
+        },
+        devDependencies: {
+          "next": "^14.0.0",
+          "react": "^18.0.0",
+          "react-dom": "^18.0.0"
+        },
+        "type": "module" 
       }, null, 2)
     }
   },
